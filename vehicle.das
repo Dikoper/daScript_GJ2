@@ -2,6 +2,7 @@ module vehicle shared
 
 require daslib/media
 require daslib/math
+require collision
 
 class Car
     image: ImageHandle
@@ -23,10 +24,19 @@ class Car
 //input values
     throttle:float
     steer_dir:int
+//transmission
+    r_gear:bool
+//collision //TODO: refactor this into single entity
+    collider: SphereBound
+    collided: bool
+    collided_with: SphereBound
 
     def reset()
         pos = float2()
-        return
+    
+    def updateCollider()
+        collider.pos = pos
+        collider.radius = wheelbase/2f
 
     def calculateForces(dt:float)
         acceleration = heading * throttle
@@ -45,9 +55,16 @@ class Car
 
         var new_heading = normalize(front_ax - rear_ax)
 
-        velocity = lerp(velocity, new_heading * length(velocity), traction)
-
-        pos += velocity
+//TODO refactor
+        if collided && collided_with.tag != TAGS TRIGGER
+            velocity = -velocity * mass
+        else
+            velocity = lerp(velocity, new_heading * length(velocity), traction)
+        
+        if r_gear
+            pos -= velocity
+        else
+            pos += velocity
 
         rotation = atan2(new_heading.y, new_heading.x) //heavy operation cost?
         heading  = float2(cos(rotation), sin(rotation))
@@ -60,14 +77,16 @@ class Car
         if get_key(VK_UP)
             throttle = 1.1f
         if get_key(VK_DOWN)
-            throttle = -0.1f
+            throttle = -0.3f
         if get_key(VK_LEFT)
             steer_dir = -1
         if get_key(VK_RIGHT)
             steer_dir = 1
         if get_key(VK_SPACE)
             traction = 0.01f
-        if get_key(VK_R)
+        if get_key_down(VK_LCONTROL)
+            r_gear = !r_gear
+        if get_key_down(VK_R)
             self->reset()
         return
 
@@ -88,23 +107,33 @@ class Car
             rotation)
         return
 
-    def drawDebugInfo()
-        var text_pos = int2(10f,10f)
-        var infoText = "Test(~ to close)\n pos - {pos}\n throttle - {throttle}\n track - {traction}\n vel - {length(velocity)}\n steer - {float(steer_dir) * steering_angle}"
-        text_out(text_pos.x,text_pos.y, infoText,0xFF00FF00)
-
+    def drawDebugGizmos()
         var f = front_ax;
         var r = rear_ax
         line(r.x,r.y,f.x,f.y,0xFFFFFF )
         circle(f.x,f.y,3f,0xFF0000)
         circle(r.x,r.y,3f,0xFDF901)
 
+        collider |> drawDebug()
+        if self.collided
+            text_out(collided_with.pos.x, collided_with.pos.y, "{collided_with.tag}", 0xFF00FF)
+
         line(pos.x,pos.y,pos.x + velocity.x ,pos.y + velocity.y, 0x00FF00)
         line(pos.x,pos.y,pos.x + heading.x* 10f,pos.y + heading.y* 10f, 0xF003F8)
-        return
 
-def rotate2D(v:float2; angle:float):float2
+    def drawDebugInfo(text_pos:float2)
+        var infoText = "Test(~ to close)
+            pos - {pos}
+            collided - {collided}
+            gear - {r_gear ? "r" : "f"}
+            throttle - {throttle}
+            track - {traction}
+            vel - {length(velocity)}
+            steer - {float(steer_dir) * steering_angle}"
+        text_out(text_pos.x,text_pos.y, infoText,0x00FF00)
+
+def rotate2D(v:float2; angle:float):float2 // sincos(x: float const; s: float& implicit; c: float& implicit)
     var result = float2()
     result.x = v.x * cos(angle) - v.y * sin(angle)
     result.y = v.x * sin(angle) + v.y * cos(angle)
-    return result
+    return <- result
