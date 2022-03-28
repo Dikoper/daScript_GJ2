@@ -1,4 +1,4 @@
-module vehicle shared
+module vehicle public
 
 require daslib/media
 require daslib/math
@@ -8,7 +8,7 @@ class Car
     image: ImageHandle
 //vehicle attrib
     mass = 2f
-    steering_angle = 0.9f //in rad
+    steering_angle = 0.6f //in rad
     wheelbase = 20f
     friction = -0.9f
 //spatial values

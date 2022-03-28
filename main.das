@@ -4,6 +4,7 @@ require daslib/math
 require camera
 require vehicle
 require collision
+require game_objects
 
 var 
     SHOW_DEBUG = true
@@ -11,6 +12,7 @@ var
     map_image:ImageHandle
     colliders:array<SphereBound>
     cam:Camera
+    a_points = new ActivitiesManager()
 
 def setupScreen()
     var cameraMtx = compose(float4(get_screen_width()/2, get_screen_height()/2,0,1),
@@ -41,11 +43,29 @@ def placeColliders()
     colliders |> push(c2)
     return
 
+def initPoints()
+    var c1 = new ActivityPoint(float2(550.,350.))
+    var c2 = new ActivityPoint(float2(550.,250.))
+    var c3 = new ActivityPoint(float2(650.,350.))
+    var c4 = new ActivityPoint(float2(750.,250.))
+    a_points.points |> push(c1)
+    a_points.points |> push(c2)
+    a_points.points |> push(c3)
+    a_points.points |> push(c4)
+    a_points->NextPoints()
+
+def drawUI()
+    var p = float2(5.,5.)
+    text_out(p.x,p.y,"Score",0xFFFFF)
+    text_out(p.x,p.y+10f,"{a_points.complete_count}",0xFFFFF)
+
+
 [export]
 def initialize
     setupScreen()
     playerSetup()
     placeColliders()
+    initPoints()
 
     map_image <- create_managed_image("./images/map.jpg")
 
@@ -61,6 +81,9 @@ def act(dt: float)
             player.collided_with = c
             break
         player.collided = false
+    
+    if(a_points.current_point.trigger |> checkWith(player.collider) && length(player.velocity) < 0.01)
+        a_points -> SwitchPoints()
     
     player->getInput()
     player->calculateForces(dt)
@@ -82,12 +105,19 @@ def draw
         float4(300,200,900,600),
         0xffffff, 
         float2(get_screen_width(), get_screen_height()))
-    player->drawCar()
     
+    player->drawCar()
+    a_points->DrawPoint()
+
     if(SHOW_DEBUG)
         for c in colliders
             c |> drawDebug()
         player->drawDebugGizmos()
+
     cam |> pop()
-    player->drawDebugInfo(float2())
+    drawUI()
+    if(SHOW_DEBUG)
+        player->drawDebugInfo(float2())
+    
+
     return

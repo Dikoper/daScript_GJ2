@@ -1,4 +1,4 @@
-module collision shared
+module collision public
 require daslib/math
 require daslib/graphics
 
