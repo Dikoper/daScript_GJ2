@@ -1,4 +1,4 @@
-module camera shared
+module camera public
 require graphics
 
 let SCREEN_CENTRE = float2(get_screen_width() / 2, get_screen_height() / 2)

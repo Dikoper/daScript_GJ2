@@ -24,7 +24,7 @@ class ActivityPoint //drop and pick points
         trigger = [[SphereBound pos = position, radius = 10f, is_static = true, tag = TAGS TRIGGER ]]
 
 
-class ActivitiesManager
+class ActivitiesManager //TODO refactor this!
     points:array<ActivityPoint?>
     current_point:ActivityPoint?
     pick_point_idx:int
@@ -33,7 +33,7 @@ class ActivitiesManager
     seed:int4
     complete_count:int // count of completed activities P->D
 
-    def NextPoints()
+    def nextPoints()    
         var idx1 = random_int(seed) % length(points)
         var idx2 = (random_int(seed) + pick_point_idx) % length(points)
         
@@ -53,7 +53,7 @@ class ActivitiesManager
         activity_state = STATES PICKING
 
 
-    def SwitchPoints()
+    def switchPoints()
         if(activity_state == STATES PICKING)
             points[pick_point_idx].is_active = false
             points[drop_point_idx].is_active = true
@@ -62,11 +62,11 @@ class ActivitiesManager
             return
         
         complete_count++
-        NextPoints()
+        nextPoints()
         
         return
 
-    def DrawPoint()
+    def drawPoint()
         //points[pick_point_idx].trigger |> drawDebug()
         //points[drop_point_idx].trigger |> drawDebug()
         current_point.trigger |> drawDebug()
