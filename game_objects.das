@@ -60,13 +60,10 @@ class ActivitiesManager //TODO refactor this!
             current_point = points[drop_point_idx]
             activity_state = STATES DROPING
             return
-        
-        complete_count++
-        nextPoints()
-        
+
+        complete_count++ // there is a bug
+        nextPoints()       
         return
 
     def drawPoint()
-        //points[pick_point_idx].trigger |> drawDebug()
-        //points[drop_point_idx].trigger |> drawDebug()
         current_point.trigger |> drawDebug()

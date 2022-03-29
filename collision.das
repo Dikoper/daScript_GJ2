@@ -13,7 +13,7 @@ struct AABBBound
     pos:float2
     size:float2
 
-def checkWith(o:AABBBound ; c:AABBBound):bool
+def checkWith(o:AABBBound ; c:SphereBound):bool
     var is_collide = false
 
     //if collided - true

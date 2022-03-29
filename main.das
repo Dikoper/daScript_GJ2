@@ -12,6 +12,7 @@ enum GAMESTATE
     INGAME
     GAMEOVER
     SCORE
+
 let
     timelimit = 100f * 60f //in seconds
 
@@ -24,6 +25,8 @@ var
     a_points = new ActivitiesManager()
     game_state:GAMESTATE
     timer:float
+    timestamp:float
+    pat_health = 100
 
 def setupScreen()
     // var cameraMtx = compose(float4(get_screen_width()/2, get_screen_height()/2,0,1),
@@ -61,17 +64,23 @@ def placeColliders()
 def initPoints()
     var c1 = new ActivityPoint(float2(550.,350.))
     var c2 = new ActivityPoint(float2(550.,250.))
-    var c3 = new ActivityPoint(float2(650.,350.))
+    var c3 = new ActivityPoint(float2(850.,350.))
     var c4 = new ActivityPoint(float2(750.,250.))
     a_points.points |> push(c1)
     a_points.points |> push(c2)
     a_points.points |> push(c3)
     a_points.points |> push(c4)
     a_points->nextPoints()
+    a_points.activity_state = STATES PICKING
 
 def resetGame()
     timer = timelimit
+    timestamp = 0f
     playerInit()
+    return
+
+def doDamage(dmg:TAGS)
+    pat_health -= 25
     return
 
 [export]
@@ -138,15 +147,31 @@ def updateGame(dt:float&)
         game_state = GAMESTATE GAMEOVER
     timer -= dt
 
+    if (a_points.activity_state == STATES DROPING)
+        if timestamp > 1.0
+            pat_health--
+            timestamp = 0f
+        timestamp += dt
+
+        if (pat_health < 1)
+            a_points.activity_state = STATES PICKING
+            a_points -> nextPoints()
+            pat_health = 100
+
     for c in colliders
         if c |> checkWith(player.collider)
             player.collided = true
             player.collided_with = c
+            if(c.tag == TAGS BUILDING)
+                doDamage(c.tag)
             break
         player.collided = false
     
-    if(a_points.current_point.trigger |> checkWith(player.collider) && length(player.velocity) < 0.01)
-        a_points -> switchPoints()
+    if (a_points.current_point.trigger |> checkWith(player.collider))
+        //panic("switching {player.pos} with {a_points.current_point.position}")
+        if (length(player.velocity) < 0.01)
+            a_points -> switchPoints()
+            
     
     player->getInput()
     player->calculateForces(dt)
@@ -173,11 +198,15 @@ def drawGame()
         for c in colliders
             c |> drawDebug()
         player->drawDebugGizmos()
+    //point arrow
+    var pointline = normalize(a_points.current_point.position - player.pos) * 20f
+    line(player.pos.x, player.pos.y, player.pos.x + pointline.x, player.pos.y + pointline.y, 0xFF0000)
 
     cam |> pop()
     drawUI()
     if(SHOW_DEBUG)
         player->drawDebugInfo(float2())
+        text_out(SCREEN_CENTRE.x,0f,"{a_points.activity_state}",0xFFFFFF)    
     return
 
 def drawUI()
@@ -187,4 +216,6 @@ def drawUI()
     text_out(p.x,p.y+10f,"{a_points.complete_count}",0xFFFFFF)
     text_out(p.x,p.y+20f,"Time",0xFFFFFF)
     text_out(p.x,p.y+30f,"{int(timer)}",0xFFFFFF) //TODO show minutes and seconds
+    text_out(p.x,p.y+40f,"Patient",0xFFFFFF)
+    text_out(p.x,p.y+50f,"{int(pat_health)}",0xFFFFFF) //TODO show minutes and seconds
     return
