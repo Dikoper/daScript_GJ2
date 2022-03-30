@@ -9,6 +9,18 @@ struct MovingObstacle // ped or car
     target:float2
     speed:float
 
+struct Patient
+    health:int
+    is_active:bool
+
+def doDamage(var p:Patient; dmg:DMG)
+    if !p.is_active
+        return
+    if dmg != DMG NONE
+        p.health -= 25
+        return
+    p.health--
+
 enum STATES
     PICKING
     DROPING
@@ -21,8 +33,7 @@ class ActivityPoint //drop and pick points
     def ActivityPoint(p:float2)
         position = p
         is_active = false
-        trigger = [[SphereBound pos = position, radius = 10f, is_static = true, tag = TAGS TRIGGER ]]
-
+        trigger = [[SphereBound pos = position, radius = 10f, is_static = true, tag = DMG TRIGGER]]
 
 class ActivitiesManager //TODO refactor this!
     points:array<ActivityPoint?>
@@ -53,7 +64,7 @@ class ActivitiesManager //TODO refactor this!
         activity_state = STATES PICKING
 
 
-    def switchPoints()
+    def switchPoints(is_complete:bool)
         if(activity_state == STATES PICKING)
             points[pick_point_idx].is_active = false
             points[drop_point_idx].is_active = true
@@ -61,7 +72,8 @@ class ActivitiesManager //TODO refactor this!
             activity_state = STATES DROPING
             return
 
-        complete_count++ // there is a bug
+        if is_complete
+            complete_count++ // there is a bug
         nextPoints()       
         return
 

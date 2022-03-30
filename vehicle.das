@@ -29,7 +29,16 @@ class Car
 //collision //TODO: refactor this into single entity
     collider: SphereBound
     collided: bool
-    collided_with: SphereBound
+    collided_with: DMG
+
+    def Car(p:float2; img:string)
+        pos = p
+        collider.pos = pos
+        collider.radius = wheelbase/2f
+        collider.tag = DMG CAR
+
+        image <- create_managed_image(img)
+        flip_image_x(image)
 
     def reset()
         pos = float2()
@@ -55,8 +64,8 @@ class Car
 
         var new_heading = normalize(front_ax - rear_ax)
 
-//TODO refactor
-        if collided && collided_with.tag != TAGS TRIGGER
+        //TODO refactor
+        if collided && collided_with != DMG TRIGGER
             velocity = -velocity * mass
         else
             velocity = lerp(velocity, new_heading * length(velocity), traction)
@@ -116,7 +125,7 @@ class Car
 
         collider |> drawDebug()
         if self.collided
-            text_out(collided_with.pos.x, collided_with.pos.y, "{collided_with.tag}", 0xFF00FF)
+            text_out(pos.x, pos.y, "{collided_with}", 0xFF00FF)
 
         line(pos.x,pos.y,pos.x + velocity.x ,pos.y + velocity.y, 0x00FF00)
         line(pos.x,pos.y,pos.x + heading.x* 10f,pos.y + heading.y* 10f, 0xF003F8)

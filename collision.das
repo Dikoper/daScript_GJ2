@@ -2,36 +2,55 @@ module collision public
 require daslib/math
 require daslib/graphics
 
-enum TAGS
+enum DMG
     NONE
     BUILDING
     TRIGGER
     CAR
     PED
 
-struct AABBBound
+struct Collider
     pos:float2
+    tag:DMG
+    is_static:bool
+
+struct AABBBound:Collider
     size:float2
 
-def checkWith(o:AABBBound ; c:SphereBound):bool
-    var is_collide = false
+def checkWith(var o:AABBBound;var c:SphereBound):bool
+    //find closest to the sphere AABB point
+    var minP = o.pos
+    var maxP = o.pos + o.size
+    var closest = c.pos
 
-    //if collided - true
-    return <- is_collide
+    if closest.x < minP.x
+        closest.x = minP.x
+    if closest.x > maxP.x
+        closest.x = maxP.x
+    
+    if closest.y < minP.y
+        closest.y = minP.y
+    if closest.y > maxP.y
+        closest.y = maxP.y
 
-struct SphereBound
-    pos:float2
+    if closest == c.pos
+        return true
+
+    //sphere test
+    var dist = closest - c.pos
+    debug("aabb c - {c.pos} d - {dist}")
+    line(c.pos.x, c.pos.y, 0f, 0f, 0xFFAABB)
+    return <- length_sq(dist) < (c.radius * c.radius)
+
+def drawDebug(var o:AABBBound)
+    rect(o.pos.x, o.pos.y, o.size.x, o.size.y, (0xABCDEF >> uint(o.tag)) * 2u)
+
+struct SphereBound:Collider
     radius:float
 
-    is_static:bool
-    tag:TAGS
-
-def drawDebug(var b:SphereBound)
-    circle(b.pos.x,b.pos.y,b.radius,(0xABCDEF >> uint(b.tag)) * 2u)
-
-def checkWith(o:SphereBound& ; c:SphereBound&):bool
-    var is_collide = false
-
+def checkWith(var o:SphereBound;var c:SphereBound):bool
     let dist = o.pos - c.pos
-    is_collide = length_sq(dist) < (o.radius + c.radius) * (o.radius + c.radius) 
-    return <- is_collide
+    return <- length_sq(dist) < (o.radius + c.radius) * (o.radius + c.radius)
+
+def drawDebug(var o:SphereBound)
+    circle(o.pos.x, o.pos.y, o.radius, (0xABCDEF >> uint(o.tag)) * 2u)

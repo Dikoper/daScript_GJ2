@@ -18,15 +18,16 @@ let
 
 var 
     SHOW_DEBUG = true
-    player = new Car()
+    player:Car?
     map_image = create_managed_image("./images/map.jpg")
-    colliders:array<SphereBound>
+    static_colliders:array<AABBBound> //array of pointers
+    dynamic_colliders:array<SphereBound> //array of pointers
     cam:Camera
     a_points = new ActivitiesManager()
     game_state:GAMESTATE
     timer:float
     timestamp:float
-    pat_health = 100
+    pat:Patient
 
 def setupScreen()
     // var cameraMtx = compose(float4(get_screen_width()/2, get_screen_height()/2,0,1),
@@ -44,21 +45,30 @@ def setupScreen()
     return
 
 def playerSetup()
-    player.image <- create_managed_image("./images/car.png") // TODO move to another init
-    player.collider.tag = TAGS CAR
-    flip_image_x(player.image)
+    player = new Car(camera::SCREEN_CENTRE, "./images/car.png")
     return
 
 def playerInit()
     player -> reset()
     player.pos = camera::SCREEN_CENTRE
+    pat.is_active = false
     return
 
 def placeColliders()
-    var c1 = [[SphereBound pos = float2(200.,250.), radius = 150., is_static = true, tag = TAGS TRIGGER]]
-    var c2 = [[SphereBound pos = float2(400.,500.), radius = 100., is_static = true, tag = TAGS BUILDING]]
-    colliders |> push(c1)
-    colliders |> push(c2)
+//trigger = new SphereBound(position, 10f, true, DMG TRIGGER)
+//[[SphereBound pos = position, radius = 10f, is_static = true, tag = DMG TRIGGER]]
+    var c1 = [[SphereBound pos = float2(200.,250.), radius = 150f, is_static = false, tag = DMG CAR]]
+    var c2 = [[SphereBound pos = float2(400.,500.), radius = 100f, is_static = false, tag = DMG TRIGGER]]
+
+    var c3 = [[AABBBound pos = float2(500.,300.), size = float2(100.,100.), is_static = true, tag = DMG BUILDING]]
+    var c4 = [[AABBBound pos = float2(700.,300.), size = float2(100.,100.), is_static = true, tag = DMG BUILDING]]
+
+    dynamic_colliders |> push(c1)
+    dynamic_colliders |> push(c2)
+    
+    static_colliders |> push(c3)
+    static_colliders |> push(c4)
+
     return
 
 def initPoints()
@@ -72,6 +82,7 @@ def initPoints()
     a_points.points |> push(c4)
     a_points->nextPoints()
     a_points.activity_state = STATES PICKING
+    a_points.complete_count = 0
 
 def resetGame()
     timer = timelimit
@@ -79,19 +90,15 @@ def resetGame()
     playerInit()
     return
 
-def doDamage(dmg:TAGS)
-    pat_health -= 25
-    return
-
 [export]
 def initialize
-    setupScreen()
     playerSetup()
     placeColliders()
     initPoints()
     resetGame()
 
     set_window_title("Jam")
+    setupScreen()
 
     game_state = GAMESTATE MENU
     return
@@ -123,7 +130,6 @@ def act(dt: float)
 
 [export]
 def draw
-
     if game_state == GAMESTATE INGAME   
         drawGame()
     
@@ -148,29 +154,39 @@ def updateGame(dt:float&)
     timer -= dt
 
     if (a_points.activity_state == STATES DROPING)
+        pat.is_active = true
         if timestamp > 1.0
-            pat_health--
+            pat |>doDamage(DMG NONE)
             timestamp = 0f
         timestamp += dt
 
-        if (pat_health < 1)
+        if (pat.health < 1)
             a_points.activity_state = STATES PICKING
             a_points -> nextPoints()
-            pat_health = 100
+            pat.is_active = false
+            pat.health = 100
 
-    for c in colliders
+    player.collided = false
+    for c in static_colliders
         if c |> checkWith(player.collider)
             player.collided = true
-            player.collided_with = c
-            if(c.tag == TAGS BUILDING)
-                doDamage(c.tag)
+            player.collided_with = c.tag
+            if(c.tag == DMG BUILDING)
+                pat |> doDamage(c.tag)
             break
-        player.collided = false
+    
+    for c in dynamic_colliders
+        if c |> checkWith(player.collider)
+            player.collided_with = c.tag
+            player.collided = true
+            if(c.tag == DMG CAR)
+                pat |> doDamage(c.tag)
+            break
     
     if (a_points.current_point.trigger |> checkWith(player.collider))
         //panic("switching {player.pos} with {a_points.current_point.position}")
         if (length(player.velocity) < 0.01)
-            a_points -> switchPoints()
+            a_points -> switchPoints(pat.is_active)
             
     
     player->getInput()
@@ -195,7 +211,9 @@ def drawGame()
     a_points->drawPoint()
 
     if(SHOW_DEBUG)
-        for c in colliders
+        for c in static_colliders
+            c |> drawDebug()
+        for c in dynamic_colliders
             c |> drawDebug()
         player->drawDebugGizmos()
     //point arrow
@@ -210,12 +228,12 @@ def drawGame()
     return
 
 def drawUI()
-    var p = float2(5.,5.)
+    var p = float2(float(get_screen_width() - 100), 0f)
 
     text_out(p.x,p.y,"Score",0xFFFFFF)
     text_out(p.x,p.y+10f,"{a_points.complete_count}",0xFFFFFF)
     text_out(p.x,p.y+20f,"Time",0xFFFFFF)
     text_out(p.x,p.y+30f,"{int(timer)}",0xFFFFFF) //TODO show minutes and seconds
     text_out(p.x,p.y+40f,"Patient",0xFFFFFF)
-    text_out(p.x,p.y+50f,"{int(pat_health)}",0xFFFFFF) //TODO show minutes and seconds
+    text_out(p.x,p.y+50f,"{int(pat.health)}",0xFFFFFF) //TODO show minutes and seconds
     return
