@@ -45,7 +45,7 @@ class Car
     
     def updateCollider()
         collider.pos = pos
-        collider.radius = wheelbase/2f
+        collider.radius = wheelbase * 0.33f
 
     def calculateForces(dt:float)
         acceleration = heading * throttle
@@ -112,7 +112,7 @@ class Car
             pos.x,pos.y, 
             float4(0,0, image.width, image.height),
             0xFFFFFF,
-            float2(wheelbase,wheelbase/2f),
+            float2(wheelbase + 10f,wheelbase*0.75f),
             rotation)
         return
 
@@ -120,8 +120,8 @@ class Car
         var f = front_ax;
         var r = rear_ax
         line(r.x,r.y,f.x,f.y,0xFFFFFF )
-        circle(f.x,f.y,3f,0xFF0000)
-        circle(r.x,r.y,3f,0xFDF901)
+        circle(f.x,f.y,7f,0xFF0000)
+        circle(r.x,r.y,7f,0xFDF901)
 
         collider |> drawDebug()
         if self.collided

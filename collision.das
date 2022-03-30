@@ -38,8 +38,6 @@ def checkWith(var o:AABBBound;var c:SphereBound):bool
 
     //sphere test
     var dist = closest - c.pos
-    debug("aabb c - {c.pos} d - {dist}")
-    line(c.pos.x, c.pos.y, 0f, 0f, 0xFFAABB)
     return <- length_sq(dist) < (c.radius * c.radius)
 
 def drawDebug(var o:AABBBound)

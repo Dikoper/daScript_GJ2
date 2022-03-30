@@ -36,46 +36,33 @@ class ActivityPoint //drop and pick points
         trigger = [[SphereBound pos = position, radius = 10f, is_static = true, tag = DMG TRIGGER]]
 
 class ActivitiesManager //TODO refactor this!
-    points:array<ActivityPoint?>
+    pick_points:array<ActivityPoint?>
+    drop_points:array<ActivityPoint?>
     current_point:ActivityPoint?
-    pick_point_idx:int
-    drop_point_idx:int
-    activity_state: STATES
     seed:int4
-    complete_count:int // count of completed activities P->D
+    pidx:int
+    didx:int
+    complete_count:int
+    activity_state: STATES   
 
     def nextPoints()    
-        var idx1 = random_int(seed) % length(points)
-        var idx2 = (random_int(seed) + pick_point_idx) % length(points)
-        
-        if idx1 == idx2
-            //panic("activities idx are the same")
-            idx1++
-            return
-        
-        pick_point_idx = idx1
-        drop_point_idx = idx2
+        pidx = random_int(seed) % length(pick_points)
+        didx = random_int(seed) % length(drop_points)
 
-        points[pick_point_idx].is_active = true
-        points[drop_point_idx].is_active = false
-
-        current_point = points[pick_point_idx]
-
+        current_point = pick_points[pidx]
+        current_point.is_active = true
         activity_state = STATES PICKING
-
 
     def switchPoints(is_complete:bool)
         if(activity_state == STATES PICKING)
-            points[pick_point_idx].is_active = false
-            points[drop_point_idx].is_active = true
-            current_point = points[drop_point_idx]
+            current_point = drop_points[didx]
+            current_point.is_active = true
             activity_state = STATES DROPING
             return
 
         if is_complete
-            complete_count++ // there is a bug
-        nextPoints()       
-        return
+            complete_count++ //?
+        nextPoints()
 
     def drawPoint()
         current_point.trigger |> drawDebug()

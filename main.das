@@ -27,36 +27,23 @@ var
     game_state:GAMESTATE
     timer:float
     timestamp:float
+    time_from_start:float
     pat:Patient
 
 def setupScreen()
-    // var cameraMtx = compose(float4(get_screen_width()/2, get_screen_height()/2,0,1),
-    //                     float4(0,0,0,1),
-    //                     float4(50,-50,1,1))
-
-    //setup_2d_camera(float2(get_screen_width() / 2, get_screen_height() / 2), 1.0)
-    //transform2d_translate(float2(get_screen_width() / 2, get_screen_height() / 2))
-    //transform2d_scale(float2(1f,1f),float2(0, 0))
-
     cam.pos = player.pos
-    cam.scale = float2(2f,2f)
+    cam.scale = float2(3f)
     cam.offset = camera::SCREEN_CENTRE
-
-    return
 
 def playerSetup()
     player = new Car(camera::SCREEN_CENTRE, "./images/car.png")
-    return
 
 def playerInit()
     player -> reset()
     player.pos = camera::SCREEN_CENTRE
     pat.is_active = false
-    return
 
 def placeColliders()
-//trigger = new SphereBound(position, 10f, true, DMG TRIGGER)
-//[[SphereBound pos = position, radius = 10f, is_static = true, tag = DMG TRIGGER]]
     var c1 = [[SphereBound pos = float2(200.,250.), radius = 150f, is_static = false, tag = DMG CAR]]
     var c2 = [[SphereBound pos = float2(400.,500.), radius = 100f, is_static = false, tag = DMG TRIGGER]]
 
@@ -69,17 +56,12 @@ def placeColliders()
     static_colliders |> push(c3)
     static_colliders |> push(c4)
 
-    return
-
 def initPoints()
-    var c1 = new ActivityPoint(float2(550.,350.))
-    var c2 = new ActivityPoint(float2(550.,250.))
-    var c3 = new ActivityPoint(float2(850.,350.))
-    var c4 = new ActivityPoint(float2(750.,250.))
-    a_points.points |> push(c1)
-    a_points.points |> push(c2)
-    a_points.points |> push(c3)
-    a_points.points |> push(c4)
+    a_points.pick_points |> push(new ActivityPoint(float2(850.,450.)))
+    a_points.pick_points |> push(new ActivityPoint(float2(850.,550.)))
+    a_points.drop_points |> push(new ActivityPoint(float2(950.,450.)))
+    a_points.drop_points |> push(new ActivityPoint(float2(950.,550.)))
+
     a_points->nextPoints()
     a_points.activity_state = STATES PICKING
     a_points.complete_count = 0
@@ -105,6 +87,10 @@ def initialize
 
 [export]
 def act(dt: float)
+    if get_key_down(VK_ESCAPE)
+        schedule_quit_game()
+    time_from_start += dt
+
     if game_state == GAMESTATE INGAME 
         updateGame(dt) //TODO fix different namings(upper lower)
         return
@@ -124,9 +110,6 @@ def act(dt: float)
         if get_key_down(VK_RETURN)
             game_state = GAMESTATE MENU
             return
-
-    if get_key_down(VK_ESCAPE)
-        schedule_quit_game()
 
 [export]
 def draw
@@ -153,19 +136,6 @@ def updateGame(dt:float&)
         game_state = GAMESTATE GAMEOVER
     timer -= dt
 
-    if (a_points.activity_state == STATES DROPING)
-        pat.is_active = true
-        if timestamp > 1.0
-            pat |>doDamage(DMG NONE)
-            timestamp = 0f
-        timestamp += dt
-
-        if (pat.health < 1)
-            a_points.activity_state = STATES PICKING
-            a_points -> nextPoints()
-            pat.is_active = false
-            pat.health = 100
-
     player.collided = false
     for c in static_colliders
         if c |> checkWith(player.collider)
@@ -183,11 +153,24 @@ def updateGame(dt:float&)
                 pat |> doDamage(c.tag)
             break
     
+    randomize_seed(a_points.seed)
+    
     if (a_points.current_point.trigger |> checkWith(player.collider))
-        //panic("switching {player.pos} with {a_points.current_point.position}")
         if (length(player.velocity) < 0.01)
             a_points -> switchPoints(pat.is_active)
-            
+    
+    if (a_points.activity_state == STATES DROPING)
+        pat.is_active = true
+        if timestamp > 1.0
+            pat |>doDamage(DMG NONE)
+            timestamp = 0f
+        timestamp += dt
+
+        if (pat.health < 1)
+            pat.is_active = false
+            pat.health = 100
+            a_points.activity_state = STATES PICKING
+            a_points -> nextPoints()
     
     player->getInput()
     player->calculateForces(dt)
@@ -235,5 +218,4 @@ def drawUI()
     text_out(p.x,p.y+20f,"Time",0xFFFFFF)
     text_out(p.x,p.y+30f,"{int(timer)}",0xFFFFFF) //TODO show minutes and seconds
     text_out(p.x,p.y+40f,"Patient",0xFFFFFF)
-    text_out(p.x,p.y+50f,"{int(pat.health)}",0xFFFFFF) //TODO show minutes and seconds
-    return
+    text_out(p.x,p.y+50f,"{int(pat.health)}",0xFFFFFF) //TODO show only when patient is on board
