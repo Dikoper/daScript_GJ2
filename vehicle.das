@@ -4,6 +4,8 @@ require daslib/media
 require daslib/math
 require collision
 
+var hit_sound: SoundHandle <- create_managed_sound("./sounds/hit.wav")
+
 class Car
     image: ImageHandle
 //vehicle attrib
@@ -34,18 +36,16 @@ class Car
     def Car(p:float2; img:string)
         pos = p
         collider.pos = pos
-        collider.radius = wheelbase/2f
+        collider.radius = wheelbase * 0.33f
         collider.tag = DMG CAR
 
         image <- create_managed_image(img)
-        flip_image_x(image)
 
     def reset()
         pos = float2()
     
     def updateCollider()
         collider.pos = pos
-        collider.radius = wheelbase * 0.33f
 
     def calculateForces(dt:float)
         acceleration = heading * throttle
@@ -66,7 +66,8 @@ class Car
 
         //TODO refactor
         if collided && collided_with != DMG TRIGGER
-            velocity = -velocity * mass
+            velocity = -velocity * (mass * 0.9f)
+            hit_sound |> play_sound(0.25f)
         else
             velocity = lerp(velocity, new_heading * length(velocity), traction)
         
@@ -101,12 +102,12 @@ class Car
 
     def drawCar()
         //shadow
-        image |> draw_image_transformed(
-            pos.x+3f,pos.y+3f,
-            float4(0,0, image.width, image.height),
-            0x000000,
-            float2(wheelbase,wheelbase/2f),
-            rotation)
+        // image |> draw_image_transformed(
+        //     pos.x+3f,pos.y+3f,
+        //     float4(0,0, image.width, image.height),
+        //     0x000000,
+        //     float2(wheelbase + 10f,wheelbase*0.75f),
+        //     rotation)
         //car
         image |> draw_image_transformed(
             pos.x,pos.y, 

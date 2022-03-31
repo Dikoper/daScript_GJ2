@@ -6,6 +6,7 @@ require vehicle
 require collision
 require game_objects
 require menus
+require map
 
 enum GAMESTATE
     MENU
@@ -14,21 +15,24 @@ enum GAMESTATE
     SCORE
 
 let
-    timelimit = 100f * 60f //in seconds
+    timelimit = 3f * 60f //in seconds
 
 var 
-    SHOW_DEBUG = true
+    SHOW_DEBUG = false
+    static_colliders:array<AABBBound>
     player:Car?
-    map_image = create_managed_image("./images/map.jpg")
-    static_colliders:array<AABBBound> //array of pointers
-    dynamic_colliders:array<SphereBound> //array of pointers
-    cam:Camera
+    obstacles = new ObstaclesManager()
     a_points = new ActivitiesManager()
+    cam:Camera
+    pat:Patient
     game_state:GAMESTATE
     timer:float
     timestamp:float
     time_from_start:float
-    pat:Patient
+
+    scrm_sound: SoundHandle <- create_managed_sound("./sounds/scream.mp3")
+
+    mus_hndlr: PlayingSoundHandle
 
 def setupScreen()
     cam.pos = player.pos
@@ -36,31 +40,28 @@ def setupScreen()
     cam.offset = camera::SCREEN_CENTRE
 
 def playerSetup()
-    player = new Car(camera::SCREEN_CENTRE, "./images/car.png")
+    player = new Car(camera::SCREEN_CENTRE, "./images/ambulance.png")
+    //make_image_color_transparent(player.image, get_pixel(player.image, 0, 0))
 
 def playerInit()
     player -> reset()
-    player.pos = camera::SCREEN_CENTRE
+    player.pos = player_spawn
     pat.is_active = false
 
-def placeColliders()
-    var c1 = [[SphereBound pos = float2(200.,250.), radius = 150f, is_static = false, tag = DMG CAR]]
-    var c2 = [[SphereBound pos = float2(400.,500.), radius = 100f, is_static = false, tag = DMG TRIGGER]]
-
-    var c3 = [[AABBBound pos = float2(500.,300.), size = float2(100.,100.), is_static = true, tag = DMG BUILDING]]
-    var c4 = [[AABBBound pos = float2(700.,300.), size = float2(100.,100.), is_static = true, tag = DMG BUILDING]]
-
-    dynamic_colliders |> push(c1)
-    dynamic_colliders |> push(c2)
-    
-    static_colliders |> push(c3)
-    static_colliders |> push(c4)
+def placeColliders()   
+    for b in static_boxes
+        var c = [[AABBBound pos = float2(b[0],b[1]), size = float2(b[2],b[3]), is_static = true, tag = DMG BUILDING]]
+        static_colliders |> push(c)
 
 def initPoints()
-    a_points.pick_points |> push(new ActivityPoint(float2(850.,450.)))
-    a_points.pick_points |> push(new ActivityPoint(float2(850.,550.)))
-    a_points.drop_points |> push(new ActivityPoint(float2(950.,450.)))
-    a_points.drop_points |> push(new ActivityPoint(float2(950.,550.)))
+    for n in navpoints
+        obstacles.waypoints |> push(n)
+
+    for d in drops
+        a_points.drop_points |> push(new ActivityPoint(d))
+
+    for p in picks
+        a_points.pick_points |> push(new ActivityPoint(p))
 
     a_points->nextPoints()
     a_points.activity_state = STATES PICKING
@@ -80,6 +81,7 @@ def initialize
     resetGame()
 
     set_window_title("Jam")
+    set_resolution(1280, 720)
     setupScreen()
 
     game_state = GAMESTATE MENU
@@ -91,11 +93,15 @@ def act(dt: float)
         schedule_quit_game()
     time_from_start += dt
 
-    if game_state == GAMESTATE INGAME 
+    if game_state == GAMESTATE INGAME
+        if !is_playing(mus_hndlr)
+            mus_hndlr = play_sound(ingameMusic)
         updateGame(dt) //TODO fix different namings(upper lower)
         return
 
-    if game_state == GAMESTATE MENU  
+    if game_state == GAMESTATE MENU
+        if !is_playing(mus_hndlr)
+            mus_hndlr = play_sound(startMusic)
         if get_key_down(VK_RETURN)
             resetGame()
             game_state = GAMESTATE INGAME
@@ -106,7 +112,9 @@ def act(dt: float)
             game_state = GAMESTATE SCORE
             return
     
-    if game_state == GAMESTATE SCORE   
+    if game_state == GAMESTATE SCORE
+        if !is_playing(mus_hndlr)
+            mus_hndlr = play_sound(scoreMusic)
         if get_key_down(VK_RETURN)
             game_state = GAMESTATE MENU
             return
@@ -116,16 +124,17 @@ def draw
     if game_state == GAMESTATE INGAME   
         drawGame()
     
-    if game_state == GAMESTATE MENU  
+    if game_state == GAMESTATE MENU
         showStartMenu()
 
     if game_state == GAMESTATE GAMEOVER
-        set_font_size(20)
-        text_out(SCREEN_CENTRE.x-20f,SCREEN_CENTRE.y-20f,"GAME OVER",0xFFFFFF)
+        drawGame()
+        set_font_size(60)
+        text_out(SCREEN_CENTRE.x-150f,SCREEN_CENTRE.y-20f,"GAME OVER\npress return", 0xFFAAFF)
         return
     
     if game_state == GAMESTATE SCORE   
-        showScoreMenu()
+        showScoreMenu(a_points.complete_count * 100)
     
     if(SHOW_DEBUG)
         text_out(0f,0f,"{game_state}",0xFFFFFF)
@@ -144,16 +153,26 @@ def updateGame(dt:float&)
             if(c.tag == DMG BUILDING)
                 pat |> doDamage(c.tag)
             break
-    
-    for c in dynamic_colliders
-        if c |> checkWith(player.collider)
-            player.collided_with = c.tag
+
+    for o in obstacles.cars
+        o.is_collide = false
+        if o.is_alive && (o.collider |> checkWith(player.collider))
+            o.is_collide = true
+            o.is_alive = false
+            player.collided_with = o.collider.tag
             player.collided = true
-            if(c.tag == DMG CAR)
-                pat |> doDamage(c.tag)
+            if(o.collider.tag == DMG CAR)
+                pat |> doDamage(o.collider.tag)
             break
+        for c in static_colliders
+            if c |> checkWith(o.collider)
+                o.is_collide = true
+
+    
+    obstacles->update(dt)
     
     randomize_seed(a_points.seed)
+    randomize_seed(obstacles.seed)
     
     if (a_points.current_point.trigger |> checkWith(player.collider))
         if (length(player.velocity) < 0.01)
@@ -171,6 +190,7 @@ def updateGame(dt:float&)
             pat.health = 100
             a_points.activity_state = STATES PICKING
             a_points -> nextPoints()
+            scrm_sound |> play_sound(0.9f)
     
     player->getInput()
     player->calculateForces(dt)
@@ -184,38 +204,35 @@ def updateGame(dt:float&)
 
 def drawGame()
     cam |> push()
-    map_image |> draw_image_region(
-        0f, 0f, 
-        float4(300,200,900,600),
-        0xffffff, 
-        float2(get_screen_width(), get_screen_height()))
+    drawMap()
     
     player->drawCar()
+    
     a_points->drawPoint()
+    obstacles->draw()
+    
 
     if(SHOW_DEBUG)
         for c in static_colliders
             c |> drawDebug()
-        for c in dynamic_colliders
-            c |> drawDebug()
         player->drawDebugGizmos()
     //point arrow
     var pointline = normalize(a_points.current_point.position - player.pos) * 20f
+    fill_circle(player.pos.x + pointline.x, player.pos.y + pointline.y, 1f, 0xFF0000)
     line(player.pos.x, player.pos.y, player.pos.x + pointline.x, player.pos.y + pointline.y, 0xFF0000)
 
     cam |> pop()
     drawUI()
     if(SHOW_DEBUG)
         player->drawDebugInfo(float2())
-        text_out(SCREEN_CENTRE.x,0f,"{a_points.activity_state}",0xFFFFFF)    
+        text_out(SCREEN_CENTRE.x,0f,"{a_points.activity_state}",0xFFFFFF)
     return
 
 def drawUI()
-    var p = float2(float(get_screen_width() - 100), 0f)
-
-    text_out(p.x,p.y,"Score",0xFFFFFF)
-    text_out(p.x,p.y+10f,"{a_points.complete_count}",0xFFFFFF)
-    text_out(p.x,p.y+20f,"Time",0xFFFFFF)
-    text_out(p.x,p.y+30f,"{int(timer)}",0xFFFFFF) //TODO show minutes and seconds
-    text_out(p.x,p.y+40f,"Patient",0xFFFFFF)
-    text_out(p.x,p.y+50f,"{int(pat.health)}",0xFFFFFF) //TODO show only when patient is on board
+    set_font_size(40)
+    text_out(10,10,"Saved",0xAAFF33)
+    text_out(10,50,"{a_points.complete_count}",0xFFFFFF)
+    text_out(float(get_screen_width() - 200), 10f,"{int(timer/60f)}:{int(timer%60f)}",0xFF0000) //TODO show minutes and seconds
+    if(a_points.activity_state == STATES DROPING)
+        text_out(SCREEN_CENTRE.x,10f,"{int(pat.health)}",0x11EE11) //TODO show only when patient is on board
+    set_font_size(20)
