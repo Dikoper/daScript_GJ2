@@ -5,6 +5,7 @@ require daslib/math
 require collision
 
 var hit_sound: SoundHandle <- create_managed_sound("./sounds/hit.wav")
+var drift_sound: SoundHandle <- create_managed_sound("./sounds/car_drift.mp3")
 
 class Car
     image: ImageHandle
@@ -26,12 +27,15 @@ class Car
 //input values
     throttle:float
     steer_dir:int
+    handbrake:bool
 //transmission
     r_gear:bool
 //collision //TODO: refactor this into single entity
     collider: SphereBound
     collided: bool
     collided_with: DMG
+
+    timer:float
 
     def Car(p:float2; img:string)
         pos = p
@@ -48,6 +52,15 @@ class Car
         collider.pos = pos
 
     def calculateForces(dt:float)
+        if(handbrake)
+            timer += dt
+
+        if(handbrake && (timer > 2f))
+            timer = 0f
+            handbrake = false
+        
+        traction = handbrake ? 0.01f : 0.1f
+
         acceleration = heading * throttle
 
         if (length(velocity) < 0.001f)
@@ -83,7 +96,6 @@ class Car
     def getInput()
         steer_dir = 0
         throttle = 0f
-        traction = 0.1f
         if get_key(VK_UP)
             throttle = 1.1f
         if get_key(VK_DOWN)
@@ -93,7 +105,8 @@ class Car
         if get_key(VK_RIGHT)
             steer_dir = 1
         if get_key(VK_SPACE)
-            traction = 0.01f
+            handbrake = true
+            drift_sound |> play_sound(0.5f,0.75f)
         if get_key_down(VK_LCONTROL)
             r_gear = !r_gear
         if get_key_down(VK_R)
