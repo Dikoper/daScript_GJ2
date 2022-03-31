@@ -1,2 +1,2 @@
-# daScript_GJ2
+# Life is too short
 daScript project for Gaijin Jam 2
